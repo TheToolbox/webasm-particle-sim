@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>particle sim</title>
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            border: 0;
+            overflow: hidden;
+            /*  Disable scrollbars */
+            display: block;
+            /* No floating content on sides */
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" width="1920" height="1080" style='position:absolute; left:0px; top:0px; width: 100%'></canvas>
+</body>
+
+<script>
+    // Returns an object containing resources that will be used later for drawing
+    function resources() {
+        let res = {
+            particle: document.createElement('canvas')
+        }
+        // Particle
+        res.particle.width = 100;
+        res.particle.height = 100;
+        let pCtx = res.particle.getContext('2d');
+
+        return res;
+    }
+    // We create this here because it will be used from within `imports`
+    let canvas = document.getElementById('canvas');
+    // Returns an object containing functions that will be linked to our wasm model
+    // This means that they can be called from Rust
+    function imports() {
+        const res = resources();
+        var ctx = canvas.getContext("2d");
+        function clear_screen() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        let maxspeed = 0;
+        function draw_particle(x, y, size, speed) {
+            maxspeed *= 0.99;
+            if (speed > maxspeed) { maxspeed = speed; }
+            
+            //console.log(`(${x},${y})`);
+            let radius = Math.sqrt(size);
+            ctx.fillStyle = `rgb(${255 * (speed/maxspeed)},${200 * Math.sqrt(speed/maxspeed)},${255 * Math.sqrt(speed/maxspeed)})`;
+            ctx.beginPath();
+            ctx.arc(x - radius, y - radius, radius * 2, 0, 2 * Math.PI);
+            ctx.fill();
+            //console.log(speed);
+            //ctx.drawImage(res.particle, x - radius, y - radius, 2 * radius, 2 * radius);
+        }
+        // The real loading and running of our wasm starts here
+        let imports = { clear_screen, draw_particle };
+        return imports;
+    }
+    // Fetch and instantiate our wasm module
+    let program = {};
+    let a = 0.1;
+    let stopped = false;
+    function stop() {
+        stopped = true;
+    }
+    function start() {
+        stopped = false;
+        requestAnimationFrame(drawAndUpdate);
+    }
+    function drawAndUpdate() {
+        program.update(a += 0.9);
+        program.draw();
+        if (stopped) { return; }
+        //setTimeout(function () {
+        requestAnimationFrame(drawAndUpdate);
+        //}, 1000);
+    }
+    fetch("webasm_particle_sim.wasm")
+        .then(response => response.arrayBuffer())
+        .then(bytes => WebAssembly.instantiate(bytes, { env: imports() }))
+        .then(results => {
+            let mod = results.instance;
+            program.update = mod.exports.update;
+            program.draw = mod.exports.draw;
+            program.addParticle = mod.exports.add_particle;
+            for (let i = 0; i < 200; i++) {
+                program.addParticle(Math.random() * 1920, Math.random() * 1080, Math.random() * Math.random() * 100);
+            }
+
+            drawAndUpdate();
+        });
+
+</script>
+
+</html>

@@ -1,0 +1,11 @@
+[package]
+name = "webasm-particle-sim"
+version = "0.1.0"
+authors = ["Jason 'Toolbox' Oettinger <jason@oettinger.email>"]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+lazy_static = "1.0.0"
